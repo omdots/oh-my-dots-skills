@@ -1,0 +1,24 @@
+name: Checks
+on: [push, pull_request]
+jobs:
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate skill metadata
+        run: |
+          ruby -ryaml <<'RUBY'
+          skills = Dir.glob('skills/*/SKILL.md')
+          abort 'No skills found' if skills.empty?
+          skills.each do |path|
+            match = File.read(path).match(/\A---\n(.*?)\n---\n(.+)\z/m)
+            abort "Missing metadata or body in #{path}" unless match && !match[2].strip.empty?
+            metadata = YAML.safe_load(match[1])
+            name = metadata['name']
+            description = metadata['description']
+            valid_name = name == File.basename(File.dirname(path)) && name.match?(/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/) && name.length <= 64
+            abort "Invalid name in #{path}" unless valid_name
+            abort "Invalid description in #{path}" unless description.is_a?(String) && (1..1024).cover?(description.strip.length)
+            puts "Validated #{name}"
+          end
+          RUBY
